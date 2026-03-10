@@ -1,6 +1,14 @@
-// Servidor HTTP. Binário
-// Ele precisa ser executado para nossa aplicação escutar requisições http.
+use axum::{
+    routing::get,
+    Router,
+};
 
-fn main() {
-    println!("Eu amo a Dri! <3");
+#[tokio::main]
+async fn main() {
+    let app = Router::new()
+        .route("/", get(|| async { "Hello, World!" }))
+        .route("/health", get(|| async { "The app is healthy!" }));
+
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.expect("Failed to bind to port 3000");
+    axum::serve(listener, app).await.expect("Failed to serve");
 }

@@ -1,0 +1,21 @@
+# Rust build artifacts — never commit this, it's huge
+/target
+
+# Environment — .env contains secrets, never commit
+.env
+*.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.iml
+
+# Logs
+*.log
+
+# NOTE: Cargo.lock is intentionally NOT ignored.
+# For binary projects (applications), lock the exact dependency versions.
+# This makes builds reproducible across machines.

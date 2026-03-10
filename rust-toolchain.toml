@@ -1,0 +1,6 @@
+# Pins the Rust compiler version for this project.
+# Everyone who opens this repo gets the exact same toolchain.
+# "stable" tracks the latest stable release (updated ~every 6 weeks).
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy", "rust-src"]

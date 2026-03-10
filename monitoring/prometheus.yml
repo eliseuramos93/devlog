@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "devlog-api"
+    static_configs:
+      - targets: ["app:3000"]   # the Axum server will expose /metrics here
+    metrics_path: "/metrics"

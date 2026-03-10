@@ -1,0 +1,132 @@
+services:
+
+  # ── Development container ────────────────────────────────────────────────────
+  # The image includes: Rust stable, cargo, rustfmt, clippy, rust-analyzer,
+  # sqlx-cli, and common dev tools (git, curl, jq, etc.).
+  app:
+    image: mcr.microsoft.com/devcontainers/rust:1-bookworm
+    volumes:
+      - ../:/workspaces/devlog:cached
+      - cargo-cache:/usr/local/cargo/registry  # persist downloaded crates across rebuilds
+    command: sleep infinity
+    environment:
+      DATABASE_URL: postgres://devlog:devlog@postgres:5432/devlog
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - devlog
+
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: devlog
+      POSTGRES_PASSWORD: devlog
+      POSTGRES_DB: devlog
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devlog -d devlog"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - devlog
+
+  # ── Redis ────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - devlog
+
+  # ── RabbitMQ (with management UI at localhost:15672) ─────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # management UI — user: guest / guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    networks:
+      - devlog
+
+  # ── Elasticsearch ────────────────────────────────────────────────────────────
+  # NOTE: ES is memory-hungry. It requests 512MB heap here (minimum).
+  # If your machine is tight on RAM, comment this block out and skip
+  # the search chapters until you have headroom.
+  elasticsearch:
+    image: elasticsearch:8.13.4
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false   # dev only — never in production
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+    networks:
+      - devlog
+
+  # ── Prometheus ───────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - devlog
+
+  # ── Grafana (UI at localhost:3001 — user: admin / admin) ────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - devlog
+
+networks:
+  devlog:
+    driver: bridge
+
+volumes:
+  cargo-cache:
+  postgres-data:
+  es-data:
+  grafana-data:
